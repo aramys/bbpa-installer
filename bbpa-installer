@@ -1,0 +1,397 @@
+#!/bin/bash
+
+# Change this to your own Playbook IP
+ip="192.168.0.5"
+
+# Add your Playbook Development Password
+password=
+
+
+# If password and ip are entered do the following
+# ./bbpa-installer -i {PACKAGE_ID}
+#
+# If password and ip are incorrect do the following
+# ./bbpa-installer -a {IP} -p {PASSWORD} -i {PACKAGE_ID}
+#
+# Locate PACKAGE_ID's at http://bbpa-installer.nexpace.com/
+#
+# Apps are served from http://apps.goodereader.com/playbook/playbook-android-apps/
+
+
+# The name of the folder where your files will be downloaded
+# You may also run the script without arguments 
+# All items in this folder will be installed and moved to 
+srcFolder="src"
+
+# All files in $srcFolder will be migrated to here when complete
+installedFolder="installed"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+############################################
+
+normal=$(tput sgr0) # Text reset.
+
+txtred=$(tput setaf 1) # Red
+txtgrn=$(tput setaf 2) # Green
+txtylw=$(tput setaf 3) # Yellow
+txtblu=$(tput setaf 4) # Blue
+txtpur=$(tput setaf 5) # Purple
+txtcyn=$(tput setaf 6) # Cyan
+txtwht=$(tput setaf 7) # White
+
+bgred=$(tput setab 1) # Red
+bggrn=$(tput setab 2) # Green
+bgylw=$(tput setab 3) # Yellow
+bgblu=$(tput setab 4) # Blue
+bgpur=$(tput setab 5) # Purple
+bgcyn=$(tput setab 6) # Cyan
+bgwht=$(tput setab 7) # White
+
+
+ext="bar"
+installTypes="*\."$ext
+
+baseDir=$(cd "$(dirname "${BASH_SOURCE[0]}")"; pwd)
+
+srcDir=$baseDir"/"$srcFolder
+installedDir=$baseDir"/"$installedFolder
+
+if [ ! -d "$srcDir" ]; then
+  mkdir $srcDir
+fi
+if [ ! -d "$installedDir" ]; then
+  mkdir $installedDir
+fi
+
+srcFiles=(`find ${srcDir} -name "*" | egrep -i "$types" | sort`)
+installedFiles=(`find ${installedDir} -name "*" | egrep -i "$types" | sort`)
+
+srcLength=${#srcFiles[*]}
+installedLength=${#installedFiles[*]}
+
+###################################################################################
+
+packageId=
+apiServer="http://bbpa-installer.nexpace.com"
+IFS=''
+use=`cat <<SETVAR
+Usage:  -i 'app-package-name' [-a $ip [-p {password} [-d {source_dir} [-x {extension}]]]]
+
+  -a    IP ADDRESS: $ip
+        Use your Playbook's IP Address in settings
+        You must have development mode on. Switch it on
+        by going to Settings > Security > Develpment Mode
+
+  -p    Password: $password
+        Set this on your Playbook by going to 
+        Settings > Security > Develpment Mode
+
+  -d    Source Directory: $srcDir
+        Edit this file to configure
+
+  -i    Install Package this will install a package 
+        Find packages at http://bbpa-installer.nexpace.com/
+
+  -x    Extension Override: This will save files as something
+        other than .$ext
+
+  -h    Help
+
+Commands: 
+  
+  list  Shows a list of all packages available 
+
+SETVAR`
+
+function queryLibrary() {
+  echo "Listing Packages..."
+  local url=$apiServer"/find.php?type=pkgs"
+  local res
+
+  if [ "$1" != "" ]; then
+    url=$url"&bar="$1
+  fi
+
+  res=`curl $url`
+
+  if [ "$res" == 0 ]; then
+    issue "Could not find any packages" 
+  else
+    more $res
+    exit 113  
+  fi
+
+}
+function searchLibrary() {
+
+  echo "Looking up package "$1"..."
+
+  local url=$apiServer"/find.php?type=ping&bar="$1
+  local res=`curl $url`
+
+  if [ "$res" -eq 0 ]; then
+    return 2
+  else
+    return 0
+  fi
+
+}
+
+function getPackage() {
+
+  echo "Downloading package "$1" -> "$srcDir
+
+  local filename=
+  local url=$apiServer"/find.php?type=link&bar="$1
+  local downloadUrl=`curl $url`
+
+  #cd $srcDir > /dev/null
+  echo "cd $srcDir > /dev/null ; curl -i $downloadUrl | grep 'Content-Disposition' | awk -F'=' '{print \$2}'| awk -F'\"' '{print \$2}'"
+  
+  filename=`curl -L -I $downloadUrl | grep 'Content-Disposition' | awk -F'=' '{print $2}'| awk -F'"' '{print $2}'`
+  echo "Package verified "$1" <==> "$filename
+  
+  ( cd $srcDir > /dev/null ; curl -o $1"."$ext $downloadUrl | grep 'Content-Disposition' | awk -F'=' '{print $2}'| awk -F'"' '{print $2}' )
+  
+  if [ "$filename" == "" ]; then
+    return 2
+  else
+    return 0
+  fi
+}
+
+function installApp() {
+  echo "Pushing App: "${txtgrn}${3##*/}${normal}" to Playbook please wait...."
+  ( java -Xmx512M -jar BarDeploy.jar -installApp -device $1 -password $2 $3"."$ext )
+
+  echo "Cleaning up... "
+  mv $srcDir"/"${3##*/}"."$ext $installedDir"/"${3##*/}"."$ext
+}
+
+function issue() {
+
+  echo ""
+  if [ "$2" != "" ]; then
+    repeat ${#1} "#" ${txtred}
+  fi
+  echo $1
+  if [ "$2" != "" ]; then
+    repeat ${#1} "#" ${txtred}
+  fi
+  echo ""
+  exit 113
+}
+
+function repeat() {
+  local i
+  local ii=$1
+  local b="#"
+  local o=""
+  local c=${normal}
+  
+  if [ "$ii" -gt 40 ]; then
+    ii=60
+  fi
+
+  if [ "$2" != "" ]; then
+    b=$2
+  fi
+
+  if [ "$3" != "" ]; then
+    c=$3
+  fi
+
+  for (( i=0 ; $i < $ii ; i=$i+1 )) do
+    o+="$b"
+  done
+  echo $c$o${normal}
+}
+
+function bye() {
+  echo $1
+  exit 113
+}
+
+function isIp() {
+
+  local  ip=$1
+  local  stat=1
+
+  if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    OIFS=$IFS
+    IFS='.'
+    ip=($ip)
+    IFS=$OIFS
+    [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
+    stat=$?
+  fi
+  return $stat
+}
+
+function isAlive() {
+  ping -c 1 $1 > /dev/null 2>&1
+  return $?
+}
+
+##################################################
+
+if [ "$1" == "list" ]; then
+  queryLibrary $2
+fi
+
+while getopts a:p:d:i:h options
+do
+case $options in
+a)
+  if isIp "$OPTARG"; then
+    ip=$OPTARG
+    echo "Attempting to connect to "$ip
+  else
+    issue "Invalid IP Address"
+  fi
+  ;;
+p)
+  if [ "$OPTARG" == "" ]; then
+    issue "Password is required"
+  else
+    password=$OPTARG
+  fi
+  ;;
+d)
+  if [ -d "$OPTARG" ]; then
+    if [ -r "$OPTARG" ]; then
+      echo "Changing your source directory to: $OPTARG"
+      read changeDirectory
+      if [ $changeDirectory == "Y" ]; then
+        srcDir=$OPTARG
+      fi
+    else
+      issue "Cannot read directory! Aborting install"
+    fi
+  else
+    issue "Invalid directory! Aborting install"
+  fi
+  ;;
+i)
+  if searchLibrary "$OPTARG"; then
+    echo "Package $OPTARG found continuing install..."
+    packageId=$OPTARG
+  else
+    issue "Could not locate $OPTARG aborting install"
+  fi
+  ;;
+x)
+  if [ "$OPTARG" == "" ]; then
+    echo "Command change extension ignored using ."$ext
+  else
+    echo "You are about to change the file download extension. Would you like to continue (Y/n)?"
+    read changeExt
+    if [ changeExt ]; then
+      ext=$OPTARG
+    else
+      echo "Extension not changed using ."$ext
+    fi
+  fi
+  ;;
+h)
+  issue "$use" 0
+  ;;
+?)
+  issue "$use" 0
+  ;;
+esac
+done
+
+##################################################
+
+echo "Pinging: $ip" 
+if isAlive "$ip"; then
+  echo "$ip found. Continuing to install App"
+else
+  issue "IP address is unreachable. Cannot find device."
+fi
+
+if [ "$password" == "" ]; then
+  issue "A password is required to continue."
+fi
+
+if [ "$packageId" == "" ]; then
+
+  for (( i=0 ; $i < $srcLength ; i=$i+1 )) do
+
+    src=${srcFiles[i]}
+    if [ -f $src ]; then
+      filename=${src##*/}
+      dest=$installedDir"/"$filename
+
+      if [ -f $dest ]; then
+        echo "App: "$dest" has already been installed. Would you like to reinstall it (Y/n)?"
+        read reinstallApp
+        if [ $reinstallApp =="Y" ]; then
+          installApp $ip $password $dest
+        else
+          bye "Goodbye"
+        fi
+      else
+        installApp $ip $password $dest
+      fi
+    fi
+  done
+
+else
+
+  src=$srcDir"/"$packageId
+  dest=$installedDir"/"$packageId
+
+  if [ -f $src"."$ext ]; then
+    installApp $ip $password $src
+  elif [ -f $dest"."$ext ]; then
+    echo "App: "$dest" has already been installed. Would you like to reinstall it (Y/n)?"
+    read reinstallApp
+    if [ $reinstallApp == "Y" ]; then
+      installApp $ip $password $dest
+    else
+      bye "Goodbye"
+    fi
+  else
+    if getPackage $packageId; then
+      echo "Package received..."
+      installApp $ip $password $src
+    else
+      issue "Failed to get package."
+    fi
+  fi
+
+fi
