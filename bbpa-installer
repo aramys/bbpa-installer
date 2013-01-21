@@ -149,7 +149,7 @@ function queryLibrary() {
   if [ "$res" == 0 ]; then
     issue "Could not find any packages" 
   else
-    more $res
+    echo $res
     exit 113  
   fi
 
