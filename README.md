@@ -33,7 +33,7 @@ Enter your IP ADDRESS
 Enter your PASSWORD 
 
 Run the script from terminal
-> cd [/path/to/Playbook_Tools_bbpa-installer-0.0.1]
+> cd [/path/to/bbpa-installer]
 > ./bbpa-installer -i {PACKAGE_ID}
 
 [OPTIONAL] Add it to your aliases to run with a single command
